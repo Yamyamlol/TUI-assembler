@@ -50,3 +50,35 @@ def save_intermediate_code(intermediate, folder):
     with open(path, "w") as f:
         for line in intermediate:
             f.write(line + "\n")
+
+if __name__ == "__main__":
+    import sys
+
+    print("=== SIC/SICXE Assembler (TUI Mode) ===")
+    arch = input("Select architecture (SIC/SICXE): ").strip().upper()
+    if arch not in ["SIC", "SICXE"]:
+        print("Invalid architecture. Use 'SIC' or 'SICXE'.")
+        sys.exit(1)
+
+    print("Enter source code lines (type 'END' on a new line to finish):")
+    source_lines = []
+    while True:
+        line = input(">>> ")
+        if line.strip().upper() == "END":
+            break
+        source_lines.append(line)
+
+    try:
+        result = assemble(source_lines, arch)
+        print(f"\nAssembly successful. Output saved in: {result['output_folder']}")
+        print("- Symbol Table -")
+        for label, addr in result["symbol_table"].items():
+            print(f"{label}\t{addr}")
+        print("\n- Intermediate Code -")
+        for line in result["intermediate"]:
+            print(line)
+        print("\n- Object Code -")
+        for line in result["object_code"]:
+            print(line)
+    except Exception as e:
+        print("Error during assembly:", e)
