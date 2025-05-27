@@ -29,40 +29,47 @@ const ResultViewer: React.FC<ResultViewerProps> = ({ results }) => {
     .join("\n");
 
   const renderBlock = (title: string, content: string, fileName: string) => (
-    <div className="mb-6">
-      <div className="flex justify-between items-center mb-2">
-        <h2 className="text-lg font-semibold">{title}</h2>
-        <div className="flex gap-2">
+    <section className="mb-8 rounded-lg border border-gray-300 shadow-md bg-white">
+      <header className="flex justify-between items-center px-6 py-4 border-b border-gray-300">
+        <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
+        <div className="flex space-x-3">
           <button
-            className="text-sm bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
+            type="button"
+            className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
             onClick={() => copyToClipboard(content)}
+            aria-label={`Copy ${title} to clipboard`}
           >
             📋 Copy
           </button>
           <button
-            className="text-sm bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700"
+            type="button"
+            className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
             onClick={() => downloadTextFile(fileName, content)}
+            aria-label={`Download ${title} as file`}
           >
-            ⬇️ Download
+            ⬇ Download
           </button>
         </div>
-      </div>
-      <pre className="bg-white border p-4 rounded shadow text-sm max-h-60 overflow-auto whitespace-pre-wrap">
+      </header>
+      <pre
+        className="p-6 max-h-72 overflow-auto whitespace-pre-wrap font-mono text-sm text-gray-800"
+        tabIndex={0}
+      >
         {content}
       </pre>
-    </div>
+    </section>
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-4xl mx-auto px-4">
       {renderBlock("📘 Symbol Table", symbolTableText, "symbol_table.txt")}
       {renderBlock(
-        "📄 Intermediate Code",
+        "Intermediate Code",
         results.intermediate.join("\n"),
         "intermediate.txt"
       )}
       {renderBlock(
-        "🧾 Object Code",
+        "Object Code",
         results.object_code.join("\n"),
         "object_code.txt"
       )}
