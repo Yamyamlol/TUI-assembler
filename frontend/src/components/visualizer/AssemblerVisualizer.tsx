@@ -483,7 +483,6 @@ const AssemblerVisualizer: React.FC<AssemblerVisualizerProps> = ({
     setPass2States(states);
   };
 
-  // Auto-play functionality
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isPlaying) {
@@ -812,7 +811,6 @@ const AssemblerVisualizer: React.FC<AssemblerVisualizerProps> = ({
 
 export default AssemblerVisualizer;
 
-// Example usage component with sample data
 export const SampleVisualizerApp: React.FC = () => {
   const sampleSourceCode = `COPY    START   1000
 FIRST   STL     RETADR
