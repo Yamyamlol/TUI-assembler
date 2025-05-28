@@ -164,7 +164,52 @@ const AssemblerVisualizer: React.FC<AssemblerVisualizerProps> = ({
     });
 
     sourceLines.forEach((line, lineIndex) => {
-      const parts = line.split(/\s+/);
+      const originalLine = line;
+
+      // Check if line is a standalone comment
+      const trimmedLine = line.trim();
+      if (
+        trimmedLine.startsWith(";") ||
+        trimmedLine.startsWith(".") ||
+        trimmedLine === ""
+      ) {
+        // Standalone comment - preserve as-is without location counter
+        intermediate.push(`\t${originalLine}`);
+        states.push({
+          step: step++,
+          currentLine: lineIndex,
+          locationCounter: locctr.toString(16).toUpperCase().padStart(4, "0"),
+          symbolTable: { ...symbolTable },
+          currentInstruction: originalLine,
+          action: "Comment line - no location counter assigned",
+          intermediate: [...intermediate],
+        });
+        return;
+      }
+
+      // Remove inline comments for parsing (but preserve original line for output)
+      let lineForParsing = line;
+      const commentIndex = line.indexOf(";");
+      if (commentIndex !== -1) {
+        lineForParsing = line.substring(0, commentIndex).trim();
+      }
+
+      // Skip empty lines after comment removal
+      if (!lineForParsing.trim()) {
+        intermediate.push(`\t${originalLine}`);
+        states.push({
+          step: step++,
+          currentLine: lineIndex,
+          locationCounter: locctr.toString(16).toUpperCase().padStart(4, "0"),
+          symbolTable: { ...symbolTable },
+          currentInstruction: originalLine,
+          action: "Empty line or comment only - no location counter assigned",
+          intermediate: [...intermediate],
+        });
+        return;
+      }
+
+      const parts = lineForParsing.split(/\s+/);
       let label = "";
       let opcode = "";
       let operand = "";
@@ -173,6 +218,7 @@ const AssemblerVisualizer: React.FC<AssemblerVisualizerProps> = ({
       if (
         parts.length >= 3 &&
         !opcodes[parts[0]] &&
+        !parts[0].startsWith("+") &&
         parts[0] !== "START" &&
         parts[0] !== "END" &&
         parts[0] !== "BYTE" &&
@@ -190,21 +236,28 @@ const AssemblerVisualizer: React.FC<AssemblerVisualizerProps> = ({
         opcode = parts[0] || "";
       }
 
+      // Handle extended format for SICXE (opcode starting with +)
+      let isExtendedFormat = false;
+      if (opcode.startsWith("+")) {
+        isExtendedFormat = true;
+        opcode = opcode.substring(1); // Remove + prefix for opcode lookup
+      }
+
       const currentAddr = locctr.toString(16).toUpperCase().padStart(4, "0");
 
       // Handle START directive
       if (opcode === "START") {
         locctr = parseInt(operand, 16) || 0;
+        intermediate.push(`${currentAddr}\t${originalLine}`);
         states.push({
           step: step++,
           currentLine: lineIndex,
           locationCounter: locctr.toString(16).toUpperCase().padStart(4, "0"),
           symbolTable: { ...symbolTable },
-          currentInstruction: line,
+          currentInstruction: originalLine,
           action: `START directive - Set location counter to ${operand}`,
-          intermediate: [...intermediate, `${currentAddr}\t${line}`],
+          intermediate: [...intermediate],
         });
-        intermediate.push(`${currentAddr}\t${line}`);
         return;
       }
 
@@ -216,7 +269,7 @@ const AssemblerVisualizer: React.FC<AssemblerVisualizerProps> = ({
             currentLine: lineIndex,
             locationCounter: currentAddr,
             symbolTable: { ...symbolTable },
-            currentInstruction: line,
+            currentInstruction: originalLine,
             action: `ERROR: Duplicate symbol '${label}'`,
             intermediate: [...intermediate],
             error: `Duplicate symbol: ${label}`,
@@ -229,7 +282,7 @@ const AssemblerVisualizer: React.FC<AssemblerVisualizerProps> = ({
           currentLine: lineIndex,
           locationCounter: currentAddr,
           symbolTable: { ...symbolTable },
-          currentInstruction: line,
+          currentInstruction: originalLine,
           action: `Add symbol '${label}' to symbol table with address ${currentAddr}`,
           intermediate: [...intermediate],
         });
@@ -237,30 +290,34 @@ const AssemblerVisualizer: React.FC<AssemblerVisualizerProps> = ({
 
       // Handle END directive
       if (opcode === "END") {
+        intermediate.push(`${currentAddr}\t${originalLine}`);
         states.push({
           step: step++,
           currentLine: lineIndex,
           locationCounter: currentAddr,
           symbolTable: { ...symbolTable },
-          currentInstruction: line,
+          currentInstruction: originalLine,
           action: "END directive - Pass 1 complete",
-          intermediate: [...intermediate, `${currentAddr}\t${line}`],
+          intermediate: [...intermediate],
         });
-        intermediate.push(`${currentAddr}\t${line}`);
         return;
       }
 
       // Calculate instruction length
       let instructionLength = 0;
       if (opcodes[opcode]) {
-        instructionLength = architecture === "SICXE" ? 3 : 3; // Default format
+        if (architecture === "SICXE" && isExtendedFormat) {
+          instructionLength = 4; // Extended format is 4 bytes
+        } else {
+          instructionLength = 3; // Standard format is 3 bytes
+        }
       } else if (opcode === "WORD") {
         instructionLength = 3;
       } else if (opcode === "BYTE") {
-        if (operand.startsWith("C'")) {
+        if (operand.startsWith("C'") && operand.endsWith("'")) {
           instructionLength = operand.length - 3; // Remove C' and '
-        } else if (operand.startsWith("X'")) {
-          instructionLength = (operand.length - 3) / 2; // Remove X' and ', hex pairs
+        } else if (operand.startsWith("X'") && operand.endsWith("'")) {
+          instructionLength = Math.ceil((operand.length - 3) / 2); // Remove X' and ', hex pairs
         }
       } else if (opcode === "RESW") {
         instructionLength = parseInt(operand) * 3;
@@ -268,15 +325,19 @@ const AssemblerVisualizer: React.FC<AssemblerVisualizerProps> = ({
         instructionLength = parseInt(operand);
       }
 
-      intermediate.push(`${currentAddr}\t${line}`);
+      // Add to intermediate with original line (including comments)
+      intermediate.push(`${currentAddr}\t${originalLine}`);
 
+      const formatInfo = isExtendedFormat ? " (Extended Format)" : "";
       states.push({
         step: step++,
         currentLine: lineIndex,
         locationCounter: currentAddr,
         symbolTable: { ...symbolTable },
-        currentInstruction: line,
-        action: `Process instruction '${opcode}' - Length: ${instructionLength} bytes`,
+        currentInstruction: originalLine,
+        action: `Process instruction '${
+          isExtendedFormat ? "+" : ""
+        }${opcode}' - Length: ${instructionLength} bytes${formatInfo}`,
         intermediate: [...intermediate],
       });
 
